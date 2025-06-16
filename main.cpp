@@ -12,6 +12,11 @@ using json = nlohmann::json;
 class Database{
 
     public:
+        Database(){
+            load();
+        }
+                
+
         void process_command(std::string command){
 
             KeyValue key_value;
@@ -48,9 +53,32 @@ class Database{
         const std::unordered_set<std::string> valid_commands = {"SET", "DEL", "GET", "LIST;"};
         std::vector<std::string> splited_command;
         std::unordered_map<std::string, std::string> in_memory;
-        std::unordered_map<int, std::unordered_map<std::string, std::string>> wal_file;
+        std::vector<json> wal_file;
         std::string action, key, value;
         int incremental_index=0;
+
+
+        void load() {
+            std::ifstream file("wal.jsonl");
+            std::string line;
+
+            while (std::getline(file, line)) {
+                if (line.empty()) continue;
+
+                json entry = json::parse(line);
+
+                if (entry["cmd"] == "SET") {
+                    in_memory[entry["key"]] = entry["value"];
+                    continue;
+                } else if (entry["cmd"] == "DEL") {
+                    in_memory.erase(entry["key"]);
+                    continue;
+                }
+                
+            }
+
+            file.close();
+        }
 
         bool execute(){
             if (this->splited_command.back().back() != ';')
@@ -95,9 +123,11 @@ class Database{
 
         in_memory[key] = value;
 
-        this->wal_file[this->incremental_index]["cmd"] = "SET";
-        this->wal_file[this->incremental_index]["key"] = key;
-        this->wal_file[this->incremental_index]["value"] = value;
+        this->wal_file.push_back({
+            {"cmd", "SET"},
+            {"key", key},
+            {"value", value}
+        });
 
         std::cout << "Value inserted!\n";
         return true;
@@ -113,9 +143,11 @@ class Database{
 
         key.pop_back();
 
-        this->wal_file[this->incremental_index]["cmd"] = "GET";
-        this->wal_file[this->incremental_index]["key"] = key;
-        this->wal_file[this->incremental_index]["value"] = in_memory[key];
+        this->wal_file.push_back({
+            {"cmd", "GET"},
+            {"key", key},
+            {"value", in_memory[key]}
+        });
 
         std::cout << "\n" << in_memory[key] << "\n";
         return true;
@@ -131,10 +163,12 @@ class Database{
         key = this->splited_command.back();
         key.pop_back();
         
-        this->wal_file[this->incremental_index]["cmd"] = "DEL";
-        this->wal_file[this->incremental_index]["key"] = key;
-        this->wal_file[this->incremental_index]["value"] = in_memory[key];
 
+        this->wal_file.push_back({
+            {"cmd", "DEL"},
+            {"key", key},
+            {"value", in_memory[key]}
+        });
 
         in_memory.erase(key);
         
@@ -143,9 +177,11 @@ class Database{
         }
 
         bool list(){
-            this->wal_file[this->incremental_index]["cmd"] = "LIST";
-            this->wal_file[this->incremental_index]["key"] = "";
-            this->wal_file[this->incremental_index]["value"] = "";
+            this->wal_file.push_back({
+                {"cmd", "LIST"},
+                {"key", ""},
+                {"value", ""}
+            });
 
             std::cout << "\n\nKey \t\tValue\n";
             for (const auto& pair : in_memory){
@@ -177,17 +213,12 @@ class Database{
 
         void save_wal() {
             std::ofstream file("wal.jsonl", std::ios::app);
-            for (auto& [index, entry] : this->wal_file) {
-                json command = { index, entry };
-                file << command.dump() << "\n";
+            for (const auto& entry : this->wal_file) {
+                file << entry.dump() << "\n";
             }
             file.close();
             this->wal_file.clear();
         }
-
-
-
-
 };
 
 int main(int argc, char const *argv[])
