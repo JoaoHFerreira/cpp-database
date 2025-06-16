@@ -9,6 +9,28 @@
 
 using json = nlohmann::json;
 
+
+class WalManager{
+    public:
+        std::vector<json> wal_file;
+
+        void generate(std::string cmd, std::string key, std::string value){
+            wal_file.push_back({
+                {"cmd", "GET"},
+                {"key", key},
+                {"value", value}
+        });
+        }
+
+        void save() {
+            std::ofstream file("wal.jsonl", std::ios::app);
+            for (const auto& entry : this->wal_file) {
+                file << entry.dump() << "\n";
+            }
+            file.close();
+            this->wal_file.clear();
+        }
+};
 class Database{
 
     public:
@@ -26,7 +48,7 @@ class Database{
                 this->execute();
                 this->splited_command.clear();
                 this->incremental_index++;
-                this->save_wal();
+                wal.save();
                 return;
             }
             this->splited_command.clear();
@@ -35,6 +57,7 @@ class Database{
     
 
     private:
+        WalManager wal;
         struct KeyValue
         {
             std::string key;
@@ -53,7 +76,6 @@ class Database{
         const std::unordered_set<std::string> valid_commands = {"SET", "DEL", "GET", "LIST;"};
         std::vector<std::string> splited_command;
         std::unordered_map<std::string, std::string> in_memory;
-        std::vector<json> wal_file;
         std::string action, key, value;
         int incremental_index=0;
 
@@ -123,12 +145,7 @@ class Database{
 
         in_memory[key] = value;
 
-        this->wal_file.push_back({
-            {"cmd", "SET"},
-            {"key", key},
-            {"value", value}
-        });
-
+        wal.generate("SET", key, value);
         std::cout << "Value inserted!\n";
         return true;
         }
@@ -143,12 +160,7 @@ class Database{
 
         key.pop_back();
 
-        this->wal_file.push_back({
-            {"cmd", "GET"},
-            {"key", key},
-            {"value", in_memory[key]}
-        });
-
+        wal.generate("GET", key, in_memory[key]);
         std::cout << "\n" << in_memory[key] << "\n";
         return true;
         }
@@ -163,13 +175,7 @@ class Database{
         key = this->splited_command.back();
         key.pop_back();
         
-
-        this->wal_file.push_back({
-            {"cmd", "DEL"},
-            {"key", key},
-            {"value", in_memory[key]}
-        });
-
+        wal.generate("DEL", key, in_memory[key]);
         in_memory.erase(key);
         
         std::cout << "Register Erased\n";
@@ -177,12 +183,7 @@ class Database{
         }
 
         bool list(){
-            this->wal_file.push_back({
-                {"cmd", "LIST"},
-                {"key", ""},
-                {"value", ""}
-            });
-
+            wal.generate("LIST", "", "");
             std::cout << "\n\nKey \t\tValue\n";
             for (const auto& pair : in_memory){
                 std::cout << pair.first << "\t\t" << pair.second << "\n";
@@ -211,15 +212,8 @@ class Database{
 
         }
 
-        void save_wal() {
-            std::ofstream file("wal.jsonl", std::ios::app);
-            for (const auto& entry : this->wal_file) {
-                file << entry.dump() << "\n";
-            }
-            file.close();
-            this->wal_file.clear();
-        }
 };
+
 
 int main(int argc, char const *argv[])
 {

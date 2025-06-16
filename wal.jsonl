@@ -7,3 +7,9 @@
 {"cmd":"DEL","key":"joao","value":"35;"}
 {"cmd":"LIST","key":"","value":""}
 {"cmd":"LIST","key":"","value":""}
+{"cmd":"LIST","key":"","value":""}
+{"cmd":"GET","key":"","value":""}
+{"cmd":"GET","key":"matheus","value":"16;"}
+{"cmd":"GET","key":"","value":""}
+{"cmd":"GET","key":"luiza","value":"35;"}
+{"cmd":"GET","key":"","value":""}
