@@ -1,0 +1,2 @@
+compilie command
+g++ main.cpp -o my_program

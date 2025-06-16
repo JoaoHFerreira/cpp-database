@@ -1,0 +1,4 @@
+[0,{"cmd":"SET","key":"joao","value":"35;"}]
+[1,{"cmd":"SET","key":"raul","value":"8;"}]
+[2,{"cmd":"LIST","key":"","value":""}]
+[3,{"cmd":"DEL","key":"raul","value":"8;"}]
