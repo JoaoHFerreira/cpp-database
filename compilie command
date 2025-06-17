@@ -1,2 +1,1 @@
-compilie command
-g++ main.cpp -o my_program
+g++ -std=c++17 main.cpp src/walManager.cpp src/commandParser.cpp  src/database.cpp  -Iinclude -o main

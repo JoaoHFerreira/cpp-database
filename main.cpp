@@ -5,59 +5,40 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
-#include "json.hpp"
+#include <json.hpp>
+#include "walManager.hpp"
+#include "commandParser.hpp"
+
 
 using json = nlohmann::json;
 
 
-class WalManager{
-    public:
-        std::vector<json> wal_file;
-
-        void generate(std::string cmd, std::string key, std::string value){
-            wal_file.push_back({
-                {"cmd", "GET"},
-                {"key", key},
-                {"value", value}
-        });
-        }
-
-        void save() {
-            std::ofstream file("wal.jsonl", std::ios::app);
-            for (const auto& entry : this->wal_file) {
-                file << entry.dump() << "\n";
-            }
-            file.close();
-            this->wal_file.clear();
-        }
-};
 class Database{
 
     public:
         Database(){
-            load();
+            // TODO: Check why is not loading properly
+            // TODO: Add unit tests, starting to get hard to track all things
+            keyValueStore = wal.loadFromWal();
         }
                 
-
-        void process_command(std::string command){
+        void processInput(std::string command){
 
             KeyValue key_value;
-            this->feed_internal_array(command);
-
-            if (this->check_command()){
-                this->execute();
-                this->splited_command.clear();
-                this->incremental_index++;
-                wal.save();
-                return;
-            }
-            this->splited_command.clear();
+            parser.tokenizerInput(command);
+            this->dispatchCommand();
+            parser.tokens.clear();
+            wal.flushWalToDisk();
             return;
+            
         }
     
 
     private:
         WalManager wal;
+        CommandParser parser;
+        std::unordered_map<std::string, std::string> keyValueStore;
+
         struct KeyValue
         {
             std::string key;
@@ -73,141 +54,78 @@ class Database{
         };
         
         
-        const std::unordered_set<std::string> valid_commands = {"SET", "DEL", "GET", "LIST;"};
-        std::vector<std::string> splited_command;
-        std::unordered_map<std::string, std::string> in_memory;
         std::string action, key, value;
-        int incremental_index=0;
 
-
-        void load() {
-            std::ifstream file("wal.jsonl");
-            std::string line;
-
-            while (std::getline(file, line)) {
-                if (line.empty()) continue;
-
-                json entry = json::parse(line);
-
-                if (entry["cmd"] == "SET") {
-                    in_memory[entry["key"]] = entry["value"];
-                    continue;
-                } else if (entry["cmd"] == "DEL") {
-                    in_memory.erase(entry["key"]);
-                    continue;
-                }
-                
-            }
-
-            file.close();
-        }
-
-        bool execute(){
-            if (this->splited_command.back().back() != ';')
-            {
-                std::cout << "Parsing Error: Missing ';' at the end\n";
-                return false;
-            }
-
+        bool dispatchCommand(){
             ActionOptions actions;
-            action = this->splited_command.front();
-
-            if (action == actions.set)
+            if (parser.action == actions.set)
             {
                 return this->set();
             }
 
-            if (action == actions.get)
+            if (parser.action == actions.get)
             {
                 return this->get();
             }
 
-            if (action == actions.del)
+            if (parser.action == actions.del)
             {
                 return this->del();
             }
 
-            if (action == actions.list)
+            if (parser.action == actions.list)
             {
                 return this->list();
-            }
+            }                
+            
             return false;
         }
 
         bool set(){
-        if (this->splited_command.size() != 3)
+            if (this->parser.validateCommand())
             {
-                std::cout << "Parsing Error: Must have 3 Elements SET and key and value. eg; SET key value;\n";
-                return false;
+                key = this->parser.tokens[1];
+                value = this->parser.tokens.back();
+
+                keyValueStore[key] = value;
+                wal.appendWalEntry("SET", key, value);
+                std::cout << "Value inserted!\n";
+                return true;
             }
-        key = this->splited_command[1];
-        value = splited_command.back();
-
-        in_memory[key] = value;
-
-        wal.generate("SET", key, value);
-        std::cout << "Value inserted!\n";
-        return true;
+            return false;
         }
 
         bool get(){
-        if (this->splited_command.size() != 2)
+        if (this->parser.validateCommand())
             {
-                std::cout << "Parsing Error: Must have 2 Elements GET and key to get. eg; GET my_\n";
-                return false;
+                key = this->parser.tokens.back();
+                key.pop_back();
+                wal.appendWalEntry("GET", key, keyValueStore[key]);
+                std::cout << "\n" << keyValueStore[key] << "\n";
+                return true;
             }
-        key = this->splited_command.back();
-
-        key.pop_back();
-
-        wal.generate("GET", key, in_memory[key]);
-        std::cout << "\n" << in_memory[key] << "\n";
-        return true;
+            return false;
         }
 
         bool del(){
-        if (this->splited_command.size() != 2)
+        if (parser.validateCommand())
             {
-                std::cout << "Parsing Error: Must have 2 Elements DEL and key to delete. eg; DEL my_\n";
-                return false;
+                key = this->parser.tokens.back();
+                key.pop_back();
+                wal.appendWalEntry("DEL", key, keyValueStore[key]);
+                keyValueStore.erase(key);
+                std::cout << "Register Erased\n";
+                return true;
             }
-        
-        key = this->splited_command.back();
-        key.pop_back();
-        
-        wal.generate("DEL", key, in_memory[key]);
-        in_memory.erase(key);
-        
-        std::cout << "Register Erased\n";
-        return true;
+            return false;
         }
 
         bool list(){
-            wal.generate("LIST", "", "");
+            wal.appendWalEntry("LIST", "", "");
             std::cout << "\n\nKey \t\tValue\n";
-            for (const auto& pair : in_memory){
+            for (const auto& pair : keyValueStore){
                 std::cout << pair.first << "\t\t" << pair.second << "\n";
             };
-            return true;
-
-        }
-
-        void feed_internal_array(std::string command){
-            std::istringstream iss(command);
-            std::string word;
-
-            while (iss >> word)
-            {
-                splited_command.push_back(word);
-            }            
-            
-        }
-
-        bool check_command(){
-            if (valid_commands.count(this->splited_command.front()) == 0) {
-                std::cout << "Parsing Error: Command must be SET, DEL, GET or LIST\n";
-                return false;
-            }
             return true;
 
         }
@@ -224,7 +142,7 @@ int main(int argc, char const *argv[])
     {
         std::cout << "localdb:: ";
         std::getline(std::cin, command);
-        db.process_command(command);
+        db.processInput(command);
     }
     
     
