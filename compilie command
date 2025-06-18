@@ -1,1 +1,11 @@
-g++ -std=c++17 main.cpp src/walManager.cpp src/commandParser.cpp  src/database.cpp  -Iinclude -o main
+g++ -std=c++17 main.cpp src/walManager.cpp src/commandParser.cpp  src/database.cpp  -I include -o main
+
+
+
+To build the command the receipt is:
+
+compiler: g++
+command_for_version: -std=c++VERSION
+files_to_compile_splited_by_space=main.cpp src/walManager.cpp src/commandParser.cpp  src/database.cpp
+command_for_hpp_includes(here, the name cam vary according with path here hpp files are): -I include
+executor_file_flag= -o NAME of the file to be compiled
