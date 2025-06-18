@@ -14057,3 +14057,15 @@
 {"cmd":"LIST","key":"","value":""}
 {"cmd":"DEL","key":"Luiza","value":"35;"}
 {"cmd":"LIST","key":"","value":""}
+{"cmd":"SET","key":"value","value":"joao;"}
+{"cmd":"SET","key":"yes","value":"no;"}
+{"cmd":"SET","key":"oi","value":"oi;"}
+{"cmd":"SET","key":"joao","value":"luiza;"}
+{"cmd":"LIST","key":"","value":""}
+{"cmd":"DEL","key":"raul","value":"8;"}
+{"cmd":"LIST","key":"","value":""}
+{"cmd":"LIST","key":"","value":""}
+{"cmd":"LIST","key":"","value":""}
+{"cmd":"DEL","key":"value","value":"joao;"}
+{"cmd":"DEL","key":"oi","value":"oi;"}
+{"cmd":"LIST","key":"","value":""}

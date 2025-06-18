@@ -19,26 +19,18 @@ void CommandParser::checkExit() {
     }
 }
 
-bool CommandParser::validateCommand() {
+std::string CommandParser::validateCommand() {
     if (isValidCommand() && endsWithSemicolon()) {
-        if (action == "SET") {
-            return validateSetSyntax();
-        }
-        if (action == "GET") {
-            return validateGetSyntax();
-        }
-        if (action == "DEL") {
-            return validateDelSyntax();
-        }
+        return "";
     }
-    return false;
+    return "Parsing Error: Command must be SET, DEL, GET or LIST\n"
+       "Parsing Error: Missing ';' at the end\n";
 }
 
 bool CommandParser::isValidCommand() {
     if (validCommands.count(tokens.front()) != 0) {
         return true;
     }
-    std::cout << "Parsing Error: Command must be SET, DEL, GET or LIST\n";
     tokens.clear();
     return false;
 }
@@ -47,7 +39,6 @@ bool CommandParser::endsWithSemicolon() {
     if (!tokens.empty() && tokens.back().back() == ';') {
         return true;
     }
-    std::cout << "Parsing Error: Missing ';' at the end\n";
     return false;
 }
 
@@ -55,7 +46,6 @@ bool CommandParser::validateSetSyntax() {
     if (tokens.size() == 3) {
         return true;
     }
-    std::cout << "Parsing Error: Must have 3 Elements SET and key and value. eg; SET key value;\n";
     return false;
 }
 
@@ -63,7 +53,6 @@ bool CommandParser::validateGetSyntax() {
     if (tokens.size() == 2) {
         return true;
     }
-    std::cout << "Parsing Error: Must have 2 Elements GET and key to get. eg; GET my_\n";
     return false;
 }
 
@@ -71,6 +60,5 @@ bool CommandParser::validateDelSyntax() {
     if (tokens.size() == 2) {
         return true;
     }
-    std::cout << "Parsing Error: Must have 2 Elements DEL and key to delete. eg; DEL my_\n";
     return false;
 }

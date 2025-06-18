@@ -14,7 +14,7 @@ class CommandParser{
 
         void tokenizerInput(std::string command);
         void checkExit();
-        bool validateCommand();
+        std::string validateCommand();
         bool isValidCommand();
         bool endsWithSemicolon();
         bool validateSetSyntax();        

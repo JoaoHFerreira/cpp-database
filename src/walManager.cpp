@@ -2,6 +2,7 @@
 #include <fstream>
 
 void WalManager::appendWalEntry(std::string cmd, std::string key, std::string value) {
+    std::lock_guard<std::mutex> lock(walMutex);
     walBuffer.push_back({
         {"cmd", cmd},
         {"key", key},
@@ -10,6 +11,7 @@ void WalManager::appendWalEntry(std::string cmd, std::string key, std::string va
 }
 
 void WalManager::flushWalToDisk() {
+    std::lock_guard<std::mutex> lock(walMutex);
     std::ofstream file("wal.jsonl", std::ios::app);
     for (const auto& entry : walBuffer) {
         file << entry.dump() << "\n";
@@ -19,6 +21,7 @@ void WalManager::flushWalToDisk() {
 }
 
 std::unordered_map<std::string, std::string> WalManager::loadFromWal() {
+    std::lock_guard<std::mutex> lock(walMutex);
     std::ifstream file("wal.jsonl");
     std::string line;
 

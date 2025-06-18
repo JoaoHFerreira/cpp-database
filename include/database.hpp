@@ -12,9 +12,11 @@ using json = nlohmann::json;
 class Database{
     public:
         Database();
-        void processInput(std::string command);
+        std::string processInput(std::string command);
 
     private:
+        std::string dbMsg;
+        std::mutex dbMutex;
         std::string action, key, value;
         WalManager wal;
         CommandParser parser;
@@ -33,10 +35,10 @@ class Database{
             std::string del="DEL";
             std::string list="LIST;";
         };
-        bool dispatchCommand();
-        bool set();
-        bool get();
-        bool del();
-        bool list();
+        std::string dispatchCommand();
+        std::string set();
+        std::string get();
+        std::string del();
+        std::string list();
 
 };

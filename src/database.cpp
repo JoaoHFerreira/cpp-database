@@ -5,70 +5,92 @@ Database::Database() {
     keyValueStore = wal.loadFromWal();
 }
 
-void Database::processInput(std::string command) {
+std::string Database::processInput(std::string command) {
     parser.tokenizerInput(command);
-    dispatchCommand();
+    dbMsg = dispatchCommand();
     parser.tokens.clear();
     wal.flushWalToDisk();
+    return dbMsg;
 }
 
-bool Database::dispatchCommand() {
+std::string Database::dispatchCommand() {
     ActionOptions actions;
-    if (parser.action == actions.set) {
-        return set();
+    dbMsg = parser.validateCommand();
+    if (dbMsg == "")
+    {
+        if (parser.action == actions.set) {
+            dbMsg = set();
+            return dbMsg;
+        }
+        if (parser.action == actions.get) {
+            dbMsg = get();
+            return dbMsg;
+        }
+        if (parser.action == actions.del) {
+            dbMsg = del();
+            return dbMsg;
+        }
+        if (parser.action == actions.list) {
+            dbMsg = list();
+            return dbMsg;
+        } 
     }
-    if (parser.action == actions.get) {
-        return get();
-    }
-    if (parser.action == actions.del) {
-        return del();
-    }
-    if (parser.action == actions.list) {
-        return list();
-    }
-    return false;
+    
+    return dbMsg;
 }
 
-bool Database::set() {
-    if (parser.validateCommand()) {
+std::string Database::set() {
+    if (parser.validateSetSyntax()) {
+        std::lock_guard<std::mutex> lock(dbMutex);
         key = parser.tokens[1];
         value = parser.tokens.back();
         keyValueStore[key] = value;
         wal.appendWalEntry("SET", key, value);
-        std::cout << "Value inserted!\n";
-        return true;
+        return "Value inserted!\n";
     }
-    return false;
+    return "Parsing Error: Must have 3 Elements SET and key and value. eg; SET key value;\n";
 }
 
-bool Database::get() {
-    if (parser.validateCommand()) {
+std::string Database::get() {
+    if (parser.validateGetSyntax()) {
+        std::lock_guard<std::mutex> lock(dbMutex);
         key = parser.tokens.back();
-        key.pop_back();  // Remove trailing semicolon
+        key.pop_back();
         wal.appendWalEntry("GET", key, keyValueStore[key]);
-        std::cout << "\n" << keyValueStore[key] << "\n";
-        return true;
+        return "\n" + keyValueStore[key] + "\n";
     }
-    return false;
+    return "Parsing Error: Must have 2 Elements GET and key to get. eg; GET my_\n";
 }
 
-bool Database::del() {
-    if (parser.validateCommand()) {
+std::string Database::del() {
+    if (parser.validateDelSyntax()) {
+        std::lock_guard<std::mutex> lock(dbMutex);
         key = parser.tokens.back();
-        key.pop_back();  // Remove trailing semicolon
+        key.pop_back();
         wal.appendWalEntry("DEL", key, keyValueStore[key]);
         keyValueStore.erase(key);
-        std::cout << "Register Erased\n";
-        return true;
+        return "Register Erased\n";
     }
-    return false;
+    return "Parsing Error: Must have 2 Elements DEL and key to delete. eg; DEL my_\n";
 }
 
-bool Database::list() {
+std::string Database::list() {
+    std::string result;
+    std::lock_guard<std::mutex> lock(dbMutex);
+    
     wal.appendWalEntry("LIST", "", "");
-    std::cout << "\n\nKey \t\tValue\n";
+
+    result = "";
     for (const auto& pair : keyValueStore) {
-        std::cout << pair.first << "\t\t" << pair.second << "\n";
+        result += pair.first + "\t\t" + pair.second + "\n";
     }
-    return true;
+    
+    if (result == "")
+    {
+        result += "No Registers\n";
+        return result;
+    }
+    
+    result += std::string("Finish Registers LIST!") + "\n";
+    return result;
 }

@@ -1,150 +1,81 @@
-// AI Tutor https://chatgpt.com/c/6840580c-5b98-800a-8a97-43ebc867fbf5
 #include <iostream>
 #include <string>
-#include <fstream>
-#include <unordered_map>
-#include <unordered_set>
-#include <sstream>
+#include <thread>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <json.hpp>
+
 #include "walManager.hpp"
 #include "commandParser.hpp"
-
+#include "database.hpp"
 
 using json = nlohmann::json;
 
+void handleClient(int clientSocket, Database& db) {
+    char buffer[1024];
+    ssize_t bytesRead;
 
-class Database{
+    while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytesRead] = '\0';  // Null-terminate input
+        std::string input(buffer);
 
-    public:
-        Database(){
-            // TODO: Check why is not loading properly
-            // TODO: Add unit tests, starting to get hard to track all things
-            keyValueStore = wal.loadFromWal();
-        }
-                
-        void processInput(std::string command){
+        std::string response = db.processInput(input);
 
-            KeyValue key_value;
-            parser.tokenizerInput(command);
-            this->dispatchCommand();
-            parser.tokens.clear();
-            wal.flushWalToDisk();
-            return;
-            
-        }
-    
+        if (response == "__DISCONNECT__") break;
 
-    private:
-        WalManager wal;
-        CommandParser parser;
-        std::unordered_map<std::string, std::string> keyValueStore;
-
-        struct KeyValue
-        {
-            std::string key;
-            std::string value;
-        };
-
-        struct ActionOptions
-        {
-            std::string set="SET";
-            std::string get="GET";
-            std::string del="DEL";
-            std::string list="LIST;";
-        };
-        
-        
-        std::string action, key, value;
-
-        bool dispatchCommand(){
-            ActionOptions actions;
-            if (parser.action == actions.set)
-            {
-                return this->set();
-            }
-
-            if (parser.action == actions.get)
-            {
-                return this->get();
-            }
-
-            if (parser.action == actions.del)
-            {
-                return this->del();
-            }
-
-            if (parser.action == actions.list)
-            {
-                return this->list();
-            }                
-            
-            return false;
+        if (!response.empty() && response.back() != '\n') {
+            response += '\n';
         }
 
-        bool set(){
-            if (this->parser.validateCommand())
-            {
-                key = this->parser.tokens[1];
-                value = this->parser.tokens.back();
+        send(clientSocket, response.c_str(), response.size(), 0);
+    }
 
-                keyValueStore[key] = value;
-                wal.appendWalEntry("SET", key, value);
-                std::cout << "Value inserted!\n";
-                return true;
-            }
-            return false;
-        }
+    std::cout << "Client disconnected\n";
+    close(clientSocket);
+}
 
-        bool get(){
-        if (this->parser.validateCommand())
-            {
-                key = this->parser.tokens.back();
-                key.pop_back();
-                wal.appendWalEntry("GET", key, keyValueStore[key]);
-                std::cout << "\n" << keyValueStore[key] << "\n";
-                return true;
-            }
-            return false;
-        }
+int main() {
+    const int PORT = 8080;
+    int server_fd, clientSocket;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
 
-        bool del(){
-        if (parser.validateCommand())
-            {
-                key = this->parser.tokens.back();
-                key.pop_back();
-                wal.appendWalEntry("DEL", key, keyValueStore[key]);
-                keyValueStore.erase(key);
-                std::cout << "Register Erased\n";
-                return true;
-            }
-            return false;
-        }
-
-        bool list(){
-            wal.appendWalEntry("LIST", "", "");
-            std::cout << "\n\nKey \t\tValue\n";
-            for (const auto& pair : keyValueStore){
-                std::cout << pair.first << "\t\t" << pair.second << "\n";
-            };
-            return true;
-
-        }
-
-};
-
-
-int main(int argc, char const *argv[])
-{
-    std::string command, value, option;
     Database db;
 
-    while (true)
-    {
-        std::cout << "localdb:: ";
-        std::getline(std::cin, command);
-        db.processInput(command);
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
     }
-    
-    
+
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(server_fd, 10) < 0) {
+        perror("listen failed");
+        exit(EXIT_FAILURE);
+    }
+
+    std::cout << "TCP server started on port " << PORT << "\n";
+
+    while (true) {
+        if ((clientSocket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0) {
+            perror("accept failed");
+            continue;
+        }
+
+        std::cout << "New client connected\n";
+        std::thread(handleClient, clientSocket, std::ref(db)).detach();
+    }
+
     return 0;
 }

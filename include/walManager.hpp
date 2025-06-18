@@ -15,4 +15,6 @@ public:
     void appendWalEntry(std::string cmd, std::string key, std::string value);
     void flushWalToDisk();
     std::unordered_map<std::string, std::string> loadFromWal();
+private:
+    std::mutex walMutex;
 };
