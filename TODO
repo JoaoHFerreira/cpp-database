@@ -1,0 +1,2 @@
+1. When exiing should exit only from the client, not from the server
+2. Right is used brute force to query the data, implement some algo to do a better work here;

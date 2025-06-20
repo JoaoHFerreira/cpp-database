@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "walManager.hpp"
 #include "commandParser.hpp"
+#include "PageManager.hpp"
 
 
 using json = nlohmann::json;
@@ -15,6 +16,7 @@ class Database{
         std::string processInput(std::string command);
 
     private:
+        PageManager pageManager{"data.db"};
         std::string dbMsg;
         std::mutex dbMutex;
         std::string action, key, value;
